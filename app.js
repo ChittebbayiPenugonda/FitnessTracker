@@ -147,6 +147,23 @@ $('back-btn').addEventListener('click', () => {
   destroyChart();
 });
 
+$('delete-exercise-btn').addEventListener('click', async () => {
+  const name = $('detail-name').textContent;
+  if (!confirm(`Delete "${name}" and all its logs? This can't be undone.`)) return;
+
+  const logs = await db.collection(userPath('logs'))
+    .where('exerciseId', '==', currentExerciseId)
+    .get();
+
+  const batch = db.batch();
+  logs.docs.forEach(doc => batch.delete(doc.ref));
+  batch.delete(db.collection(userPath('exercises')).doc(currentExerciseId));
+  await batch.commit();
+
+  destroyChart();
+  showScreen('list');
+});
+
 $('detail-log-btn').addEventListener('click', () => {
   openLogModal(currentExerciseId, $('detail-name').textContent);
 });

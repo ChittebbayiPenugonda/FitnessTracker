@@ -145,6 +145,9 @@ html, body {
   line-height: 1;
 }
 
+.danger-btn { color: #ef4444; }
+.danger-btn:active { background: rgba(239, 68, 68, 0.15); }
+
 .text-btn {
   background: none;
   border: none;
