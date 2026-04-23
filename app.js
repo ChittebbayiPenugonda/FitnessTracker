@@ -40,34 +40,15 @@ function showScreen(name) {
 function loadGroups() {
   db.collection(userPath('groups'))
     .orderBy('createdAt')
-    .onSnapshot(async snap => {
-      if (snap.empty) {
-        // Auto-init defaults if exercises already exist (from old seed)
-        const exSnap = await db.collection(userPath('exercises')).limit(1).get();
-        if (!exSnap.empty) await initDefaultGroups();
-        else { allGroups = []; renderTabs(); }
-        return;
-      }
+    .onSnapshot(snap => {
       allGroups = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // If active group was deleted, fall back to All
+      if (activeGroup !== 'all' && !allGroups.find(g => g.id === activeGroup)) {
+        activeGroup = 'all';
+      }
       renderTabs();
       renderGroupPicker();
     }, console.error);
-}
-
-async function initDefaultGroups() {
-  const batch = db.batch();
-  const base  = Date.now();
-  [
-    { id: 'upper', name: 'Upper Body' },
-    { id: 'arms',  name: 'Arms'       },
-    { id: 'legs',  name: 'Legs & Abs' }
-  ].forEach(({ id, name }, i) => {
-    batch.set(
-      db.collection(userPath('groups')).doc(id),
-      { name, createdAt: firebase.firestore.Timestamp.fromMillis(base + i) }
-    );
-  });
-  await batch.commit();
 }
 
 function renderTabs() {
@@ -77,7 +58,7 @@ function renderTabs() {
     ${allGroups.map(g =>
       `<button class="tab ${activeGroup === g.id ? 'active' : ''}" data-group="${g.id}">${g.name}</button>`
     ).join('')}
-    <button class="tab tab-add" id="add-group-tab-btn" aria-label="New group">+</button>
+    <button class="tab tab-add" id="add-group-tab-btn" aria-label="Manage groups">+</button>
   `;
 
   bar.querySelectorAll('.tab:not(.tab-add)').forEach(tab => {
@@ -89,27 +70,69 @@ function renderTabs() {
     });
   });
 
-  $('add-group-tab-btn').addEventListener('click', () => {
-    $('new-group-input').value = '';
-    $('new-group-modal').classList.remove('hidden');
-    setTimeout(() => $('new-group-input').focus(), 80);
+  $('add-group-tab-btn').addEventListener('click', openManageGroupsModal);
+}
+
+// ── Manage Groups Modal ───────────────────────────────────────────────────────
+function openManageGroupsModal() {
+  $('new-group-input').value = '';
+  renderManageGroupsList();
+  $('manage-groups-modal').classList.remove('hidden');
+  setTimeout(() => $('new-group-input').focus(), 80);
+}
+
+function renderManageGroupsList() {
+  const list = $('manage-groups-list');
+  list.innerHTML = allGroups.map(g =>
+    `<div class="manage-group-item">
+      <span class="manage-group-name" data-gid="${g.id}">${g.name}</span>
+      <button class="manage-group-delete" data-gid="${g.id}" data-gname="${g.name}" aria-label="Delete">×</button>
+    </div>`
+  ).join('');
+
+  list.querySelectorAll('.manage-group-name').forEach(el => {
+    el.addEventListener('click', () => renameGroup(el.dataset.gid, el.textContent));
+  });
+  list.querySelectorAll('.manage-group-delete').forEach(btn => {
+    btn.addEventListener('click', () => deleteGroup(btn.dataset.gid, btn.dataset.gname));
   });
 }
 
-// ── New Group Modal ───────────────────────────────────────────────────────────
-$('cancel-new-group-btn').addEventListener('click', () => $('new-group-modal').classList.add('hidden'));
+async function renameGroup(groupId, currentName) {
+  const newName = prompt('Rename group:', currentName)?.trim();
+  if (!newName || newName === currentName) return;
+  await db.collection(userPath('groups')).doc(groupId).update({ name: newName });
+  // Update chip on detail screen if this group is currently shown
+  if (currentExerciseGrp === groupId) {
+    $('detail-group-chip').textContent = newName;
+  }
+}
+
+async function deleteGroup(groupId, groupName) {
+  const exSnap = await db.collection(userPath('exercises'))
+    .where('group', '==', groupId).get();
+  const count = exSnap.size;
+  const msg = count > 0
+    ? `Delete "${groupName}"? ${count} exercise${count !== 1 ? 's' : ''} will become ungrouped.`
+    : `Delete "${groupName}"?`;
+  if (!confirm(msg)) return;
+  await db.collection(userPath('groups')).doc(groupId).delete();
+  // renderManageGroupsList is called automatically via onSnapshot → renderTabs chain
+  renderManageGroupsList();
+}
+
+$('cancel-manage-groups-btn').addEventListener('click', () => $('manage-groups-modal').classList.add('hidden'));
 $('save-new-group-btn').addEventListener('click', saveNewGroup);
 $('new-group-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveNewGroup(); });
 
 async function saveNewGroup() {
   const name = $('new-group-input').value.trim();
   if (!name) return;
-  $('new-group-modal').classList.add('hidden');
+  $('new-group-input').value = '';
   const ref = await db.collection(userPath('groups')).add({
     name,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
-  // Switch to the new group tab
   activeGroup = ref.id;
   setNewGroup(ref.id);
 }
@@ -501,7 +524,7 @@ document.querySelectorAll('.unit-btn').forEach(btn => {
 });
 
 // ── Close modals on overlay tap ───────────────────────────────────────────────
-['log-modal', 'add-modal', 'new-group-modal', 'move-modal', 'edit-log-modal'].forEach(id => {
+['log-modal', 'add-modal', 'manage-groups-modal', 'move-modal', 'edit-log-modal'].forEach(id => {
   $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).classList.add('hidden'); });
 });
 

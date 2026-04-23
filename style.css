@@ -279,6 +279,59 @@ html, body {
 }
 .delete-exercise-btn:active { background: rgba(239, 68, 68, 0.1); }
 
+/* ── Manage Groups list ── */
+.manage-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.manage-groups-list:empty::after {
+  content: 'No groups yet';
+  color: var(--muted);
+  font-size: 14px;
+  padding: 8px 0;
+  display: block;
+}
+
+.manage-group-item {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  gap: 10px;
+}
+
+.manage-group-name {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--muted);
+}
+.manage-group-name:active { opacity: 0.6; }
+
+.manage-group-delete {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 22px;
+  font-weight: 300;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.manage-group-delete:active { opacity: 0.6; }
+
 /* ── Move group list ── */
 .move-group-list {
   display: flex;

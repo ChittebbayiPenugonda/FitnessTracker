@@ -104,15 +104,19 @@
     </div>
   </div>
 
-  <!-- ── New Group Modal ── -->
-  <div id="new-group-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+  <!-- ── Manage Groups Modal ── -->
+  <div id="manage-groups-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
     <div class="modal">
-      <h2>New Group</h2>
-      <input type="text" id="new-group-input" placeholder="e.g. Push Day"
-             class="text-input" autocomplete="off">
-      <div class="modal-actions">
-        <button id="cancel-new-group-btn" class="btn-secondary">Cancel</button>
-        <button id="save-new-group-btn" class="btn-primary">Create</button>
+      <h2>Groups</h2>
+      <div id="manage-groups-list" class="manage-groups-list"></div>
+      <div class="field">
+        <label>New Group</label>
+        <input type="text" id="new-group-input" placeholder="e.g. Push Day"
+               class="text-input" autocomplete="off" style="margin-bottom:0">
+      </div>
+      <div class="modal-actions" style="margin-top:16px">
+        <button id="cancel-manage-groups-btn" class="btn-secondary">Done</button>
+        <button id="save-new-group-btn" class="btn-primary">Add</button>
       </div>
     </div>
   </div>
