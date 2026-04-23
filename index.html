@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#111827">
+  <link rel="manifest" href="manifest.json">
+  <title>GymLog</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Auth Screen ── -->
+  <div id="auth-screen" class="screen">
+    <div class="auth-container">
+      <div class="auth-logo">⟳</div>
+      <h1>GymLog</h1>
+      <p class="auth-sub">Progressive overload tracker</p>
+      <button id="google-signin-btn" class="btn-primary btn-large">Sign in with Google</button>
+    </div>
+  </div>
+
+  <!-- ── Exercise List Screen ── -->
+  <div id="list-screen" class="screen hidden">
+    <header class="top-bar">
+      <h1>GymLog</h1>
+      <button id="signout-btn" class="text-btn">Sign out</button>
+    </header>
+    <div id="exercise-list" class="list-container">
+      <div class="state-msg">Loading…</div>
+    </div>
+    <button id="add-exercise-fab" class="fab" aria-label="Add exercise">+</button>
+  </div>
+
+  <!-- ── Exercise Detail Screen ── -->
+  <div id="detail-screen" class="screen hidden">
+    <header class="top-bar">
+      <button id="back-btn" class="icon-btn">←</button>
+      <h1 id="detail-name" class="truncate">Exercise</h1>
+      <button id="detail-log-btn" class="btn-accent">Log</button>
+    </header>
+    <div class="chart-wrapper">
+      <canvas id="progress-chart"></canvas>
+      <div id="chart-empty" class="chart-empty hidden">No logs yet — start logging!</div>
+    </div>
+    <div id="log-list" class="log-list">
+      <div class="state-msg">Loading…</div>
+    </div>
+  </div>
+
+  <!-- ── Log Modal ── -->
+  <div id="log-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2 id="log-modal-title">Log Set</h2>
+
+      <div class="field">
+        <label>Weight</label>
+        <div class="stepper">
+          <button class="step-btn" data-target="weight-input" data-step="-5">−</button>
+          <input type="number" id="weight-input" value="45" min="0" step="any" inputmode="decimal">
+          <button class="step-btn" data-target="weight-input" data-step="5">+</button>
+        </div>
+        <div class="unit-toggle">
+          <button class="unit-btn active" data-unit="lbs">lbs</button>
+          <button class="unit-btn" data-unit="kg">kg</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Reps</label>
+        <div class="stepper">
+          <button class="step-btn" data-target="reps-input" data-step="-1">−</button>
+          <input type="number" id="reps-input" value="8" min="1" step="1" inputmode="numeric">
+          <button class="step-btn" data-target="reps-input" data-step="1">+</button>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="cancel-log-btn" class="btn-secondary">Cancel</button>
+        <button id="save-log-btn" class="btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Add Exercise Modal ── -->
+  <div id="add-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>New Exercise</h2>
+      <input type="text" id="new-exercise-input" placeholder="e.g. Bench Press"
+             class="text-input" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="modal-actions">
+        <button id="cancel-add-btn" class="btn-secondary">Cancel</button>
+        <button id="save-exercise-btn" class="btn-primary">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase + Chart.js -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
