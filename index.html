@@ -28,6 +28,12 @@
       <h1>GymLog</h1>
       <button id="signout-btn" class="text-btn">Sign out</button>
     </header>
+    <div class="tab-bar">
+      <button class="tab active" data-group="all">All</button>
+      <button class="tab" data-group="upper">Upper</button>
+      <button class="tab" data-group="arms">Arms</button>
+      <button class="tab" data-group="legs">Legs</button>
+    </div>
     <div id="exercise-list" class="list-container">
       <div class="state-msg">Loading…</div>
     </div>
@@ -90,6 +96,14 @@
       <h2>New Exercise</h2>
       <input type="text" id="new-exercise-input" placeholder="e.g. Bench Press"
              class="text-input" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="field">
+        <label>Group</label>
+        <div class="group-picker" id="group-picker">
+          <button class="group-btn active" data-group="upper">Upper Body</button>
+          <button class="group-btn" data-group="arms">Arms</button>
+          <button class="group-btn" data-group="legs">Legs &amp; Abs</button>
+        </div>
+      </div>
       <div class="modal-actions">
         <button id="cancel-add-btn" class="btn-secondary">Cancel</button>
         <button id="save-exercise-btn" class="btn-primary">Add</button>
