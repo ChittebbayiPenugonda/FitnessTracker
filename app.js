@@ -455,8 +455,37 @@ $('delete-log-btn').addEventListener('click', async () => {
   if (!confirm('Delete this log entry?')) return;
   $('edit-log-modal').classList.add('hidden');
   await db.collection(userPath('logs')).doc(editingLogId).delete();
+  await refreshExerciseLastLog(currentExerciseId);
   loadDetail(currentExerciseId);
 });
+
+async function refreshExerciseLastLog(exerciseId) {
+  const snap = await db.collection(userPath('logs'))
+    .where('exerciseId', '==', exerciseId)
+    .get();
+
+  const exRef = db.collection(userPath('exercises')).doc(exerciseId);
+
+  if (snap.empty) {
+    await exRef.update({ lastLog: null, lastLoggedDate: null, lastLoggedAt: null });
+    return;
+  }
+
+  const latest = snap.docs
+    .map(d => d.data())
+    .sort((a, b) => (b.timestamp?.seconds ?? 0) - (a.timestamp?.seconds ?? 0))[0];
+
+  const d = latest.timestamp?.toDate();
+  const dateStr = d
+    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    : null;
+
+  await exRef.update({
+    lastLog:        `${latest.weight} ${latest.unit ?? 'lbs'} × ${latest.reps} reps`,
+    lastLoggedDate: dateStr,
+    lastLoggedAt:   latest.timestamp
+  });
+}
 
 // ── Log Modal ─────────────────────────────────────────────────────────────────
 async function openLogModal(exerciseId, exerciseName) {
