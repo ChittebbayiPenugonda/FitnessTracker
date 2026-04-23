@@ -133,11 +133,11 @@ async function loadDetail(exerciseId) {
 
   const snap = await db.collection(userPath('logs'))
     .where('exerciseId', '==', exerciseId)
-    .orderBy('timestamp', 'desc')
-    .limit(100)
     .get();
 
-  const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const logs = snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.timestamp?.seconds ?? 0) - (a.timestamp?.seconds ?? 0));
   renderChart(logs.slice().reverse());
   renderLogList(logs);
 }
@@ -258,12 +258,12 @@ async function openLogModal(exerciseId, exerciseName) {
 
   const snap = await db.collection(userPath('logs'))
     .where('exerciseId', '==', exerciseId)
-    .orderBy('timestamp', 'desc')
-    .limit(1)
     .get();
 
   if (!snap.empty) {
-    const last = snap.docs[0].data();
+    const last = snap.docs
+      .map(d => d.data())
+      .sort((a, b) => (b.timestamp?.seconds ?? 0) - (a.timestamp?.seconds ?? 0))[0];
     $('weight-input').value = last.weight;
     $('reps-input').value   = last.reps;
     setUnit(last.unit ?? 'lbs');
