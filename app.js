@@ -3,19 +3,22 @@ const auth = firebase.auth();
 const db   = firebase.firestore();
 
 // ── State ────────────────────────────────────────────────────────────────────
-let currentUser       = null;
-let currentExerciseId = null;
-let progressChart     = null;
-let selectedUnit      = 'lbs';
-let activeGroup       = 'all';
-let selectedNewGroup  = 'upper';
-let allExercises      = [];
+let currentUser        = null;
+let currentExerciseId  = null;
+let currentExerciseGrp = null;
+let progressChart      = null;
+let selectedUnit       = 'lbs';
+let activeGroup        = 'all';
+let selectedNewGroup   = null;
+let allExercises       = [];
+let allGroups          = [];
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 auth.onAuthStateChanged(user => {
   currentUser = user;
   if (user) {
     showScreen('list');
+    loadGroups();
     loadExercises();
   } else {
     showScreen('auth');
@@ -25,7 +28,6 @@ auth.onAuthStateChanged(user => {
 $('google-signin-btn').addEventListener('click', () => {
   auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(console.error);
 });
-
 $('signout-btn').addEventListener('click', () => auth.signOut());
 
 // ── Screens ──────────────────────────────────────────────────────────────────
@@ -34,17 +36,83 @@ function showScreen(name) {
   $(`${name}-screen`).classList.remove('hidden');
 }
 
-// ── Tabs ─────────────────────────────────────────────────────────────────────
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    activeGroup = tab.dataset.group;
-    // Default new exercise group to the active tab (if not "all")
-    if (activeGroup !== 'all') setNewGroup(activeGroup);
-    renderExercises();
+// ── Groups ────────────────────────────────────────────────────────────────────
+function loadGroups() {
+  db.collection(userPath('groups'))
+    .orderBy('createdAt')
+    .onSnapshot(async snap => {
+      if (snap.empty) {
+        // Auto-init defaults if exercises already exist (from old seed)
+        const exSnap = await db.collection(userPath('exercises')).limit(1).get();
+        if (!exSnap.empty) await initDefaultGroups();
+        else { allGroups = []; renderTabs(); }
+        return;
+      }
+      allGroups = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderTabs();
+      renderGroupPicker();
+    }, console.error);
+}
+
+async function initDefaultGroups() {
+  const batch = db.batch();
+  const base  = Date.now();
+  [
+    { id: 'upper', name: 'Upper Body' },
+    { id: 'arms',  name: 'Arms'       },
+    { id: 'legs',  name: 'Legs & Abs' }
+  ].forEach(({ id, name }, i) => {
+    batch.set(
+      db.collection(userPath('groups')).doc(id),
+      { name, createdAt: firebase.firestore.Timestamp.fromMillis(base + i) }
+    );
   });
-});
+  await batch.commit();
+}
+
+function renderTabs() {
+  const bar = $('tab-bar');
+  bar.innerHTML = `
+    <button class="tab ${activeGroup === 'all' ? 'active' : ''}" data-group="all">All</button>
+    ${allGroups.map(g =>
+      `<button class="tab ${activeGroup === g.id ? 'active' : ''}" data-group="${g.id}">${g.name}</button>`
+    ).join('')}
+    <button class="tab tab-add" id="add-group-tab-btn" aria-label="New group">+</button>
+  `;
+
+  bar.querySelectorAll('.tab:not(.tab-add)').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activeGroup = tab.dataset.group;
+      if (activeGroup !== 'all') setNewGroup(activeGroup);
+      renderTabs();
+      renderExercises();
+    });
+  });
+
+  $('add-group-tab-btn').addEventListener('click', () => {
+    $('new-group-input').value = '';
+    $('new-group-modal').classList.remove('hidden');
+    setTimeout(() => $('new-group-input').focus(), 80);
+  });
+}
+
+// ── New Group Modal ───────────────────────────────────────────────────────────
+$('cancel-new-group-btn').addEventListener('click', () => $('new-group-modal').classList.add('hidden'));
+$('save-new-group-btn').addEventListener('click', saveNewGroup);
+$('new-group-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveNewGroup(); });
+
+async function saveNewGroup() {
+  const name = $('new-group-input').value.trim();
+  if (!name) return;
+  $('new-group-modal').classList.add('hidden');
+  const ref = await db.collection(userPath('groups')).add({
+    name,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  // Switch to the new group tab
+  activeGroup = ref.id;
+  setNewGroup(ref.id);
+}
 
 // ── Exercise List ─────────────────────────────────────────────────────────────
 function loadExercises() {
@@ -63,11 +131,10 @@ function renderExercises() {
     : allExercises.filter(ex => ex.group === activeGroup);
 
   if (filtered.length === 0) {
-    const label = { upper: 'Upper Body', arms: 'Arms', legs: 'Legs & Abs' }[activeGroup] ?? '';
+    const label = allGroups.find(g => g.id === activeGroup)?.name ?? '';
     list.innerHTML = `<div class="state-msg">${label ? `No ${label} exercises yet.` : 'No exercises yet.'}\nTap + to add one.</div>`;
     return;
   }
-
   list.innerHTML = '';
   filtered.forEach(ex => list.appendChild(buildExerciseCard(ex)));
 }
@@ -77,7 +144,7 @@ function buildExerciseCard(ex) {
   card.className = 'exercise-card';
   const safeName = ex.name.replace(/'/g, "\\'");
   card.innerHTML = `
-    <div class="card-body" onclick="openDetail('${ex.id}', '${safeName}')">
+    <div class="card-body" onclick="openDetail('${ex.id}', '${safeName}', '${ex.group ?? ''}')">
       <span class="card-name">${ex.name}</span>
       <span class="card-last">${ex.lastLog ?? 'No logs yet'}</span>
     </div>
@@ -90,6 +157,7 @@ function buildExerciseCard(ex) {
 // ── Add Exercise ──────────────────────────────────────────────────────────────
 $('add-exercise-fab').addEventListener('click', () => {
   $('new-exercise-input').value = '';
+  renderGroupPicker();
   $('add-modal').classList.remove('hidden');
   setTimeout(() => $('new-exercise-input').focus(), 80);
 });
@@ -98,20 +166,35 @@ $('cancel-add-btn').addEventListener('click', () => $('add-modal').classList.add
 $('save-exercise-btn').addEventListener('click', saveExercise);
 $('new-exercise-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveExercise(); });
 
-function setNewGroup(group) {
-  selectedNewGroup = group;
-  document.querySelectorAll('.group-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.group === group);
+function renderGroupPicker() {
+  const picker = $('group-picker');
+  if (allGroups.length === 0) {
+    picker.innerHTML = '<span style="color:var(--muted);font-size:13px">No groups yet — create one with the + tab</span>';
+    return;
+  }
+  // Default selectedNewGroup to activeGroup if valid, else first group
+  if (!selectedNewGroup || !allGroups.find(g => g.id === selectedNewGroup)) {
+    selectedNewGroup = activeGroup !== 'all' ? activeGroup : allGroups[0]?.id;
+  }
+  picker.innerHTML = allGroups.map(g =>
+    `<button class="group-btn ${selectedNewGroup === g.id ? 'active' : ''}"
+             data-group="${g.id}">${g.name}</button>`
+  ).join('');
+  picker.querySelectorAll('.group-btn').forEach(btn => {
+    btn.addEventListener('click', () => setNewGroup(btn.dataset.group));
   });
 }
 
-document.querySelectorAll('.group-btn').forEach(btn => {
-  btn.addEventListener('click', () => setNewGroup(btn.dataset.group));
-});
+function setNewGroup(groupId) {
+  selectedNewGroup = groupId;
+  document.querySelectorAll('.group-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.group === groupId);
+  });
+}
 
 async function saveExercise() {
   const name = $('new-exercise-input').value.trim();
-  if (!name) return;
+  if (!name || !selectedNewGroup) return;
   $('add-modal').classList.add('hidden');
   await db.collection(userPath('exercises')).add({
     name,
@@ -121,9 +204,14 @@ async function saveExercise() {
 }
 
 // ── Exercise Detail ───────────────────────────────────────────────────────────
-function openDetail(id, name) {
-  currentExerciseId = id;
+function openDetail(id, name, groupId) {
+  currentExerciseId  = id;
+  currentExerciseGrp = groupId;
   $('detail-name').textContent = name;
+
+  const groupName = allGroups.find(g => g.id === groupId)?.name ?? '';
+  $('detail-group-chip').textContent = groupName;
+
   showScreen('detail');
   loadDetail(id);
 }
@@ -138,6 +226,7 @@ async function loadDetail(exerciseId) {
   const logs = snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
     .sort((a, b) => (b.timestamp?.seconds ?? 0) - (a.timestamp?.seconds ?? 0));
+
   renderChart(logs.slice().reverse());
   renderLogList(logs);
 }
@@ -147,9 +236,40 @@ $('back-btn').addEventListener('click', () => {
   destroyChart();
 });
 
+$('detail-log-btn').addEventListener('click', () => {
+  openLogModal(currentExerciseId, $('detail-name').textContent);
+});
+
+// ── Move Exercise ─────────────────────────────────────────────────────────────
+$('move-exercise-btn').addEventListener('click', () => {
+  const list = $('move-group-list');
+  const others = allGroups.filter(g => g.id !== currentExerciseGrp);
+
+  if (others.length === 0) {
+    list.innerHTML = '<div class="state-msg">No other groups.\nCreate one with the + tab first.</div>';
+  } else {
+    list.innerHTML = others.map(g =>
+      `<button class="move-group-btn" data-gid="${g.id}" data-gname="${g.name}">${g.name}</button>`
+    ).join('');
+    list.querySelectorAll('.move-group-btn').forEach(btn => {
+      btn.addEventListener('click', () => moveExercise(btn.dataset.gid, btn.dataset.gname));
+    });
+  }
+  $('move-modal').classList.remove('hidden');
+});
+
+$('cancel-move-btn').addEventListener('click', () => $('move-modal').classList.add('hidden'));
+
+async function moveExercise(groupId, groupName) {
+  $('move-modal').classList.add('hidden');
+  currentExerciseGrp = groupId;
+  $('detail-group-chip').textContent = groupName;
+  await db.collection(userPath('exercises')).doc(currentExerciseId).update({ group: groupId });
+}
+
+// ── Delete Exercise ───────────────────────────────────────────────────────────
 $('delete-exercise-btn').addEventListener('click', async () => {
-  const name = $('detail-name').textContent;
-  if (!confirm(`Delete "${name}" and all its logs? This can't be undone.`)) return;
+  if (!confirm(`Delete "${$('detail-name').textContent}" and all its logs? This can't be undone.`)) return;
 
   const logs = await db.collection(userPath('logs'))
     .where('exerciseId', '==', currentExerciseId)
@@ -164,10 +284,6 @@ $('delete-exercise-btn').addEventListener('click', async () => {
   showScreen('list');
 });
 
-$('detail-log-btn').addEventListener('click', () => {
-  openLogModal(currentExerciseId, $('detail-name').textContent);
-});
-
 // ── Chart ─────────────────────────────────────────────────────────────────────
 function renderChart(logs) {
   const canvas = $('progress-chart');
@@ -179,7 +295,6 @@ function renderChart(logs) {
     empty.classList.remove('hidden');
     return;
   }
-
   canvas.classList.remove('hidden');
   empty.classList.add('hidden');
 
@@ -253,7 +368,6 @@ function renderLogList(logs) {
     container.innerHTML = '<div class="state-msg">No logs yet</div>';
     return;
   }
-
   let lastDay = null;
   container.innerHTML = logs.map(log => {
     const date = log.timestamp?.toDate();
@@ -261,13 +375,64 @@ function renderLogList(logs) {
     const header = day !== lastDay ? `<div class="date-header">${day}</div>` : '';
     lastDay = day;
     return `${header}
-      <div class="log-item">
+      <div class="log-item log-item-tap" data-log-id="${log.id}">
         <span class="log-weight">${log.weight} ${log.unit ?? 'lbs'}</span>
         <span class="log-reps">${log.reps} reps</span>
         <span class="log-time">${date ? fmtTime(date) : ''}</span>
+        <span class="log-edit-hint">edit</span>
       </div>`;
   }).join('');
+
+  // Attach tap handlers
+  container.querySelectorAll('.log-item-tap').forEach(item => {
+    item.addEventListener('click', () => {
+      const log = logs.find(l => l.id === item.dataset.logId);
+      if (log) openEditLogModal(log);
+    });
+  });
 }
+
+// ── Edit Log Modal ────────────────────────────────────────────────────────────
+let editingLogId   = null;
+let editingLogUnit = 'lbs';
+
+function openEditLogModal(log) {
+  editingLogId   = log.id;
+  editingLogUnit = log.unit ?? 'lbs';
+  $('edit-weight-input').value = log.weight;
+  $('edit-reps-input').value   = log.reps;
+  document.querySelectorAll('.edit-unit-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.unit === editingLogUnit);
+  });
+  $('edit-log-modal').classList.remove('hidden');
+}
+
+document.querySelectorAll('.edit-unit-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    editingLogUnit = btn.dataset.unit;
+    document.querySelectorAll('.edit-unit-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.unit === editingLogUnit));
+  });
+});
+
+$('cancel-edit-log-btn').addEventListener('click', () => $('edit-log-modal').classList.add('hidden'));
+
+$('save-edit-log-btn').addEventListener('click', async () => {
+  const weight = parseFloat($('edit-weight-input').value);
+  const reps   = parseInt($('edit-reps-input').value, 10);
+  if (isNaN(weight) || weight < 0 || isNaN(reps) || reps < 1) return;
+
+  $('edit-log-modal').classList.add('hidden');
+  await db.collection(userPath('logs')).doc(editingLogId).update({ weight, reps, unit: editingLogUnit });
+  loadDetail(currentExerciseId);
+});
+
+$('delete-log-btn').addEventListener('click', async () => {
+  if (!confirm('Delete this log entry?')) return;
+  $('edit-log-modal').classList.add('hidden');
+  await db.collection(userPath('logs')).doc(editingLogId).delete();
+  loadDetail(currentExerciseId);
+});
 
 // ── Log Modal ─────────────────────────────────────────────────────────────────
 async function openLogModal(exerciseId, exerciseName) {
@@ -336,10 +501,8 @@ document.querySelectorAll('.unit-btn').forEach(btn => {
 });
 
 // ── Close modals on overlay tap ───────────────────────────────────────────────
-['log-modal', 'add-modal'].forEach(id => {
-  $(id).addEventListener('click', e => {
-    if (e.target === $(id)) $(id).classList.add('hidden');
-  });
+['log-modal', 'add-modal', 'new-group-modal', 'move-modal', 'edit-log-modal'].forEach(id => {
+  $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).classList.add('hidden'); });
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -352,64 +515,59 @@ function fmtTime(d) {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-// ── Seed ─────────────────────────────────────────────────────────────────────
-// Run once from the browser console after signing in: seedData()
+// ── Seed (run once from browser console: seedData()) ─────────────────────────
 const SEED = [
-  // Upper Body
   { name: 'Inclined Smith Machine Bench Press', group: 'upper', weight: 65,  reps: 7,  date: '2026-04-23' },
   { name: 'Seated Rows',                        group: 'upper', weight: 145, reps: 7,  date: '2026-04-23' },
-  { name: 'Lat Pulldown',                        group: 'upper', weight: 150, reps: 7,  date: '2026-04-23' },
-  { name: 'Weighted Dips',                       group: 'upper' },
-  { name: 'Pec Fly',                             group: 'upper', weight: 140, reps: 7,  date: '2026-04-23' },
-  { name: 'Anterior Fly',                        group: 'upper' },
-  { name: 'Regular Press',                       group: 'upper', weight: 150, reps: 10, date: '2026-04-20' },
-  // Arms
-  { name: 'Shoulder Press',                      group: 'arms',  weight: 125, reps: 7,  date: '2026-04-22' },
-  { name: 'Bench Incline Dumbbell Curls',        group: 'arms',  weight: 40,  reps: 10, date: '2026-03-16' },
-  { name: 'Overhead Tricep Extension',           group: 'arms',  weight: 50,  reps: 7,  date: '2026-04-10' },
-  { name: 'Cable Lateral Raises',                group: 'arms',  weight: 30,  reps: 6,  date: '2026-02-22' },
-  { name: 'Tricep Pushdown',                     group: 'arms',  weight: 130, reps: 7,  date: '2026-03-16' },
-  { name: 'Preacher Curls',                      group: 'arms',  weight: 120, reps: 8,  date: '2026-03-16' },
-  { name: 'Hammer Curls',                        group: 'arms',  weight: 35,  reps: 13, date: '2026-02-05' },
-  // Legs & Abs
-  { name: 'Leg Press',                           group: 'legs',  weight: 260, reps: 9,  date: '2026-04-21' },
-  { name: 'Calf Extensions',                     group: 'legs' },
-  { name: 'Hamstring Curls',                     group: 'legs',  weight: 110, reps: 7,  date: '2026-04-23' },
-  { name: 'Leg Extensions',                      group: 'legs',  weight: 120, reps: 7,  date: '2026-04-23' },
-  { name: 'Ab Crunch',                           group: 'legs',  weight: 130, reps: 6,  date: '2026-04-23' },
-  { name: 'Leg Raises',                          group: 'legs' },
+  { name: 'Lat Pulldown',                       group: 'upper', weight: 150, reps: 7,  date: '2026-04-23' },
+  { name: 'Weighted Dips',                      group: 'upper' },
+  { name: 'Pec Fly',                            group: 'upper', weight: 140, reps: 7,  date: '2026-04-23' },
+  { name: 'Anterior Fly',                       group: 'upper' },
+  { name: 'Regular Press',                      group: 'upper', weight: 150, reps: 10, date: '2026-04-20' },
+  { name: 'Shoulder Press',                     group: 'arms',  weight: 125, reps: 7,  date: '2026-04-22' },
+  { name: 'Bench Incline Dumbbell Curls',       group: 'arms',  weight: 40,  reps: 10, date: '2026-03-16' },
+  { name: 'Overhead Tricep Extension',          group: 'arms',  weight: 50,  reps: 7,  date: '2026-04-10' },
+  { name: 'Cable Lateral Raises',               group: 'arms',  weight: 30,  reps: 6,  date: '2026-02-22' },
+  { name: 'Tricep Pushdown',                    group: 'arms',  weight: 130, reps: 7,  date: '2026-03-16' },
+  { name: 'Preacher Curls',                     group: 'arms',  weight: 120, reps: 8,  date: '2026-03-16' },
+  { name: 'Hammer Curls',                       group: 'arms',  weight: 35,  reps: 13, date: '2026-02-05' },
+  { name: 'Leg Press',                          group: 'legs',  weight: 260, reps: 9,  date: '2026-04-21' },
+  { name: 'Calf Extensions',                    group: 'legs' },
+  { name: 'Hamstring Curls',                    group: 'legs',  weight: 110, reps: 7,  date: '2026-04-23' },
+  { name: 'Leg Extensions',                     group: 'legs',  weight: 120, reps: 7,  date: '2026-04-23' },
+  { name: 'Ab Crunch',                          group: 'legs',  weight: 130, reps: 6,  date: '2026-04-23' },
+  { name: 'Leg Raises',                         group: 'legs' },
 ];
 
 window.seedData = async function () {
   if (!currentUser) { console.error('Not signed in'); return; }
-
   const existing = await db.collection(userPath('exercises')).limit(1).get();
-  if (!existing.empty) {
-    console.warn('Exercises already exist — skipping seed to avoid duplicates.');
-    return;
-  }
+  if (!existing.empty) { console.warn('Exercises already exist — skipping.'); return; }
 
-  console.log('Seeding…');
+  // Create groups first with stable IDs
+  const groupBatch = db.batch();
+  const base = Date.now();
+  [{ id: 'upper', name: 'Upper Body' }, { id: 'arms', name: 'Arms' }, { id: 'legs', name: 'Legs & Abs' }]
+    .forEach(({ id, name }, i) => {
+      groupBatch.set(db.collection(userPath('groups')).doc(id), {
+        name, createdAt: firebase.firestore.Timestamp.fromMillis(base + i)
+      });
+    });
+  await groupBatch.commit();
+
+  console.log('Seeding exercises…');
   for (const ex of SEED) {
-    const ts      = ex.date ? firebase.firestore.Timestamp.fromDate(new Date(ex.date)) : firebase.firestore.Timestamp.now();
+    const ts      = firebase.firestore.Timestamp.fromDate(new Date(ex.date ?? '2026-04-23'));
     const lastLog = ex.weight != null ? `${ex.weight} lbs × ${ex.reps} reps` : null;
-
-    const exRef = await db.collection(userPath('exercises')).add({
-      name: ex.name,
-      group: ex.group,
-      createdAt: ts,
+    const exRef   = await db.collection(userPath('exercises')).add({
+      name: ex.name, group: ex.group, createdAt: ts,
       ...(lastLog && { lastLog, lastLoggedAt: ts })
     });
-
     if (ex.weight != null) {
       await db.collection(userPath('logs')).add({
-        exerciseId: exRef.id,
-        weight:     ex.weight,
-        reps:       ex.reps,
-        unit:       'lbs',
-        timestamp:  ts
+        exerciseId: exRef.id, weight: ex.weight, reps: ex.reps, unit: 'lbs', timestamp: ts
       });
     }
   }
-  console.log('Done! All exercises seeded.');
+  console.log('Done!');
 };

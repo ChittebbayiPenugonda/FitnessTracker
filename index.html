@@ -28,12 +28,7 @@
       <h1>GymLog</h1>
       <button id="signout-btn" class="text-btn">Sign out</button>
     </header>
-    <div class="tab-bar">
-      <button class="tab active" data-group="all">All</button>
-      <button class="tab" data-group="upper">Upper</button>
-      <button class="tab" data-group="arms">Arms</button>
-      <button class="tab" data-group="legs">Legs</button>
-    </div>
+    <div id="tab-bar" class="tab-bar"></div>
     <div id="exercise-list" class="list-container">
       <div class="state-msg">Loading…</div>
     </div>
@@ -45,23 +40,26 @@
     <header class="top-bar">
       <button id="back-btn" class="icon-btn">←</button>
       <h1 id="detail-name" class="truncate">Exercise</h1>
-      <button id="delete-exercise-btn" class="icon-btn danger-btn" aria-label="Delete exercise">🗑</button>
       <button id="detail-log-btn" class="btn-accent">Log</button>
     </header>
     <div class="chart-wrapper">
       <canvas id="progress-chart"></canvas>
       <div id="chart-empty" class="chart-empty hidden">No logs yet — start logging!</div>
     </div>
+    <div class="detail-meta">
+      <span id="detail-group-chip" class="group-chip"></span>
+      <button id="move-exercise-btn" class="text-btn">Move to…</button>
+    </div>
     <div id="log-list" class="log-list">
       <div class="state-msg">Loading…</div>
     </div>
+    <button id="delete-exercise-btn" class="delete-exercise-btn">Delete Exercise</button>
   </div>
 
   <!-- ── Log Modal ── -->
   <div id="log-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
     <div class="modal">
       <h2 id="log-modal-title">Log Set</h2>
-
       <div class="field">
         <label>Weight</label>
         <div class="stepper">
@@ -74,7 +72,6 @@
           <button class="unit-btn" data-unit="kg">kg</button>
         </div>
       </div>
-
       <div class="field">
         <label>Reps</label>
         <div class="stepper">
@@ -83,7 +80,6 @@
           <button class="step-btn" data-target="reps-input" data-step="1">+</button>
         </div>
       </div>
-
       <div class="modal-actions">
         <button id="cancel-log-btn" class="btn-secondary">Cancel</button>
         <button id="save-log-btn" class="btn-primary">Save</button>
@@ -99,16 +95,66 @@
              class="text-input" autocomplete="off" autocorrect="off" spellcheck="false">
       <div class="field">
         <label>Group</label>
-        <div class="group-picker" id="group-picker">
-          <button class="group-btn active" data-group="upper">Upper Body</button>
-          <button class="group-btn" data-group="arms">Arms</button>
-          <button class="group-btn" data-group="legs">Legs &amp; Abs</button>
-        </div>
+        <div class="group-picker" id="group-picker"></div>
       </div>
       <div class="modal-actions">
         <button id="cancel-add-btn" class="btn-secondary">Cancel</button>
         <button id="save-exercise-btn" class="btn-primary">Add</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ── New Group Modal ── -->
+  <div id="new-group-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>New Group</h2>
+      <input type="text" id="new-group-input" placeholder="e.g. Push Day"
+             class="text-input" autocomplete="off">
+      <div class="modal-actions">
+        <button id="cancel-new-group-btn" class="btn-secondary">Cancel</button>
+        <button id="save-new-group-btn" class="btn-primary">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Edit Log Modal ── -->
+  <div id="edit-log-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>Edit Log</h2>
+      <div class="field">
+        <label>Weight</label>
+        <div class="stepper">
+          <button class="step-btn" data-target="edit-weight-input" data-step="-5">−</button>
+          <input type="number" id="edit-weight-input" value="45" min="0" step="any" inputmode="decimal">
+          <button class="step-btn" data-target="edit-weight-input" data-step="5">+</button>
+        </div>
+        <div class="unit-toggle" id="edit-unit-toggle">
+          <button class="edit-unit-btn unit-btn active" data-unit="lbs">lbs</button>
+          <button class="edit-unit-btn unit-btn" data-unit="kg">kg</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Reps</label>
+        <div class="stepper">
+          <button class="step-btn" data-target="edit-reps-input" data-step="-1">−</button>
+          <input type="number" id="edit-reps-input" value="8" min="1" step="1" inputmode="numeric">
+          <button class="step-btn" data-target="edit-reps-input" data-step="1">+</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="cancel-edit-log-btn" class="btn-secondary">Cancel</button>
+        <button id="save-edit-log-btn" class="btn-primary">Save</button>
+      </div>
+      <button id="delete-log-btn" class="delete-exercise-btn" style="margin-top:8px;border-radius:10px">Delete This Log</button>
+    </div>
+  </div>
+
+  <!-- ── Move Exercise Modal ── -->
+  <div id="move-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>Move to Group</h2>
+      <div id="move-group-list" class="move-group-list"></div>
+      <button id="cancel-move-btn" class="btn-secondary" style="width:100%;margin-top:8px">Cancel</button>
     </div>
   </div>
 

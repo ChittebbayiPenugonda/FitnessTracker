@@ -145,9 +145,6 @@ html, body {
   line-height: 1;
 }
 
-.danger-btn { color: #ef4444; }
-.danger-btn:active { background: rgba(239, 68, 68, 0.15); }
-
 .text-btn {
   background: none;
   border: none;
@@ -191,11 +188,15 @@ html, body {
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.tab-bar::-webkit-scrollbar { display: none; }
 
 .tab {
-  flex: 1;
-  padding: 8px 4px;
+  flex-shrink: 0;
+  padding: 8px 14px;
   border-radius: 8px;
   border: none;
   background: none;
@@ -204,6 +205,7 @@ html, body {
   font-weight: 600;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
 }
 .tab.active {
   background: var(--accent-dim);
@@ -211,7 +213,13 @@ html, body {
 }
 .tab:active { opacity: 0.7; }
 
-/* ── Group Picker (add modal) ── */
+.tab-add {
+  color: var(--accent);
+  font-size: 20px;
+  padding: 4px 10px;
+}
+
+/* ── Group Picker (add exercise modal) ── */
 .group-picker {
   display: flex;
   gap: 8px;
@@ -233,6 +241,68 @@ html, body {
   background: var(--accent-dim);
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* ── Detail meta row ── */
+.detail-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.group-chip {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+
+/* ── Delete Exercise button ── */
+.delete-exercise-btn {
+  width: 100%;
+  padding: 18px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  color: #ef4444;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+.delete-exercise-btn:active { background: rgba(239, 68, 68, 0.1); }
+
+/* ── Move group list ── */
+.move-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.move-group-btn {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, border-color 0.1s;
+}
+.move-group-btn:active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
 }
 
 /* ── Exercise List ── */
@@ -364,6 +434,18 @@ html, body {
 .log-time {
   font-size: 12px;
   color: var(--muted);
+}
+
+.log-item-tap { cursor: pointer; }
+.log-item-tap:active { background: var(--border); }
+
+.log-edit-hint {
+  font-size: 11px;
+  color: var(--border);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 /* ── Modals ── */
