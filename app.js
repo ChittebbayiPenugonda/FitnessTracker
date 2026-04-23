@@ -164,15 +164,16 @@ function renderExercises() {
 
 function buildExerciseCard(ex) {
   const card = document.createElement('div');
-  card.className = 'exercise-card';
+  const doneToday = ex.lastLoggedDate === todayStr();
+  card.className = 'exercise-card' + (doneToday ? ' done-today' : '');
   const safeName = ex.name.replace(/'/g, "\\'");
   card.innerHTML = `
     <div class="card-body" onclick="openDetail('${ex.id}', '${safeName}', '${ex.group ?? ''}')">
       <span class="card-name">${ex.name}</span>
       <span class="card-last">${ex.lastLog ?? 'No logs yet'}</span>
     </div>
-    <button class="card-quick-log" aria-label="Log set"
-            onclick="openLogModal('${ex.id}', '${safeName}')">+</button>
+    <button class="card-quick-log ${doneToday ? 'card-quick-log--done' : ''}" aria-label="Log set"
+            onclick="openLogModal('${ex.id}', '${safeName}')">${doneToday ? '✓' : '+'}</button>
   `;
   return card;
 }
@@ -495,7 +496,7 @@ async function saveLog() {
 
   const batch = db.batch();
   batch.set(logRef, { exerciseId: currentExerciseId, weight, reps, unit: selectedUnit, timestamp: ts });
-  batch.update(exRef, { lastLog, lastLoggedAt: ts });
+  batch.update(exRef, { lastLog, lastLoggedAt: ts, lastLoggedDate: todayStr() });
   await batch.commit();
 
   if (!$('detail-screen').classList.contains('hidden') && currentExerciseId) {
@@ -536,6 +537,10 @@ function fmtDate(d) {
 }
 function fmtTime(d) {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 // ── Seed (run once from browser console: seedData()) ─────────────────────────

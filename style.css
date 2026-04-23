@@ -423,6 +423,20 @@ html, body {
   color: #111;
 }
 
+.exercise-card.done-today {
+  border-left: 3px solid #22c55e;
+}
+
+.card-quick-log--done {
+  background: rgba(34, 197, 94, 0.12) !important;
+  color: #22c55e !important;
+  font-size: 22px !important;
+}
+.card-quick-log--done:active {
+  background: #22c55e !important;
+  color: #111 !important;
+}
+
 /* ── Detail Screen ── */
 .chart-wrapper {
   height: 230px;
