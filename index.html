@@ -26,6 +26,7 @@
   <div id="list-screen" class="screen hidden">
     <header class="top-bar">
       <h1>GymLog</h1>
+      <button id="analytics-btn" class="text-btn">Stats</button>
       <button id="signout-btn" class="text-btn">Sign out</button>
     </header>
     <div id="tab-bar" class="tab-bar"></div>
@@ -33,6 +34,23 @@
       <div class="state-msg">Loading…</div>
     </div>
     <button id="add-exercise-fab" class="fab" aria-label="Add exercise">+</button>
+  </div>
+
+  <!-- ── Analytics Screen ── -->
+  <div id="analytics-screen" class="screen hidden">
+    <header class="top-bar">
+      <button id="analytics-back-btn" class="icon-btn">←</button>
+      <h1>Stats</h1>
+    </header>
+    <div class="analytics-body">
+      <div class="cal-nav">
+        <button id="cal-prev-btn" class="icon-btn">←</button>
+        <span id="cal-month-label"></span>
+        <button id="cal-next-btn" class="icon-btn">→</button>
+      </div>
+      <div id="calendar-grid" class="calendar-grid"></div>
+      <div id="analytics-legend" class="analytics-legend"></div>
+    </div>
   </div>
 
   <!-- ── Exercise Detail Screen ── -->

@@ -572,6 +572,131 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// ── Analytics ────────────────────────────────────────────────────────────────
+const GROUP_COLORS = ['#3b82f6','#10b981','#8b5cf6','#ef4444','#f97316','#06b6d4','#ec4899','#84cc16'];
+const MONTH_NAMES  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+let analyticsYear  = new Date().getFullYear();
+let analyticsMonth = new Date().getMonth();
+
+function groupColor(groupId) {
+  const idx = allGroups.findIndex(g => g.id === groupId);
+  return GROUP_COLORS[idx % GROUP_COLORS.length] ?? '#9ca3af';
+}
+
+$('analytics-btn').addEventListener('click', () => {
+  analyticsYear  = new Date().getFullYear();
+  analyticsMonth = new Date().getMonth();
+  showScreen('analytics');
+  renderAnalytics();
+});
+
+$('analytics-back-btn').addEventListener('click', () => showScreen('list'));
+
+$('cal-prev-btn').addEventListener('click', () => {
+  analyticsMonth--;
+  if (analyticsMonth < 0) { analyticsMonth = 11; analyticsYear--; }
+  renderAnalytics();
+});
+
+$('cal-next-btn').addEventListener('click', () => {
+  analyticsMonth++;
+  if (analyticsMonth > 11) { analyticsMonth = 0; analyticsYear++; }
+  renderAnalytics();
+});
+
+async function renderAnalytics() {
+  $('cal-month-label').textContent = `${MONTH_NAMES[analyticsMonth]} ${analyticsYear}`;
+  $('calendar-grid').innerHTML = '<div class="cal-day-header" style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:13px">Loading…</div>';
+
+  const start = new Date(analyticsYear, analyticsMonth, 1);
+  const end   = new Date(analyticsYear, analyticsMonth + 1, 1);
+
+  const snap = await db.collection(userPath('logs'))
+    .where('timestamp', '>=', firebase.firestore.Timestamp.fromDate(start))
+    .where('timestamp', '<',  firebase.firestore.Timestamp.fromDate(end))
+    .get();
+
+  // dateStr → Set of groupIds
+  const dayGroups = {};
+  snap.docs.forEach(doc => {
+    const log  = doc.data();
+    const date = log.timestamp?.toDate();
+    if (!date) return;
+    const ds  = dateToStr(date);
+    const ex  = allExercises.find(e => e.id === log.exerciseId);
+    const gid = ex?.group;
+    if (!gid) return;
+    if (!dayGroups[ds]) dayGroups[ds] = new Set();
+    dayGroups[ds].add(gid);
+  });
+
+  renderCalendarGrid(dayGroups);
+  renderAnalyticsLegend(dayGroups);
+}
+
+function renderCalendarGrid(dayGroups) {
+  const grid   = $('calendar-grid');
+  const today  = new Date();
+  const days   = new Date(analyticsYear, analyticsMonth + 1, 0).getDate();
+  const offset = new Date(analyticsYear, analyticsMonth, 1).getDay(); // 0=Sun
+
+  grid.innerHTML = '';
+
+  // Day-of-week headers
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-day-header';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  // Empty offset cells
+  for (let i = 0; i < offset; i++) {
+    grid.appendChild(document.createElement('div'));
+  }
+
+  // Day cells
+  for (let day = 1; day <= days; day++) {
+    const ds      = `${analyticsYear}-${String(analyticsMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isToday = today.getFullYear() === analyticsYear && today.getMonth() === analyticsMonth && today.getDate() === day;
+    const groups  = dayGroups[ds] ? [...dayGroups[ds]] : [];
+
+    const cell = document.createElement('div');
+    cell.className = 'cal-day' + (isToday ? ' cal-today' : '');
+    cell.innerHTML = `
+      <span class="cal-day-num">${day}</span>
+      <div class="cal-dots">
+        ${groups.map(gid => `<span class="cal-dot" style="background:${groupColor(gid)}"></span>`).join('')}
+      </div>`;
+    grid.appendChild(cell);
+  }
+}
+
+function renderAnalyticsLegend(dayGroups) {
+  // Only show groups that appear in this month
+  const usedGroups = new Set(Object.values(dayGroups).flatMap(s => [...s]));
+  const legend = $('analytics-legend');
+
+  if (usedGroups.size === 0) {
+    legend.innerHTML = '<div class="state-msg" style="padding:16px 0">No workouts logged this month</div>';
+    return;
+  }
+
+  legend.innerHTML = allGroups
+    .filter(g => usedGroups.has(g.id))
+    .map(g => `
+      <div class="legend-item">
+        <span class="legend-dot" style="background:${groupColor(g.id)}"></span>
+        ${g.name}
+      </div>`)
+    .join('');
+}
+
+function dateToStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // ── Seed (run once from browser console: seedData()) ─────────────────────────
 const SEED = [
   { name: 'Inclined Smith Machine Bench Press', group: 'upper', weight: 65,  reps: 7,  date: '2026-04-23' },
