@@ -255,10 +255,11 @@ $('cancel-add-btn').addEventListener('click', () => $('add-modal').classList.add
 $('save-exercise-btn').addEventListener('click', saveExercise);
 $('new-exercise-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveExercise(); });
 
-document.querySelectorAll('.type-btn').forEach(btn => {
+document.querySelectorAll('.type-opt').forEach(btn => {
   btn.addEventListener('click', () => {
     selectedNewType = btn.dataset.type;
-    document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === selectedNewType));
+    document.querySelectorAll('.type-opt').forEach(b =>
+      b.classList.toggle('active', b.dataset.type === selectedNewType));
   });
 });
 

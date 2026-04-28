@@ -867,6 +867,32 @@ html, body {
   flex-shrink: 0;
 }
 
+/* ── Type toggle (Strength / Cardio) ── */
+.type-toggle {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.type-opt {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.type-opt.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
 /* ── Cardio badge ── */
 .cardio-badge {
   display: inline-block;
