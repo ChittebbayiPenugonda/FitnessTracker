@@ -333,6 +333,13 @@ html, body {
 }
 .manage-group-delete:active { opacity: 0.6; }
 
+/* ── Group chips (detail screen, multiple) ── */
+.group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 /* ── Move group list ── */
 .move-group-list {
   display: flex;

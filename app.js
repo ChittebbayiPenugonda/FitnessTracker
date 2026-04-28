@@ -4,17 +4,29 @@ const db   = firebase.firestore();
 
 // ── Themes ───────────────────────────────────────────────────────────────────
 const THEMES = {
-  default: { label: 'Amber',  accent: '#f59e0b', dim: 'rgba(245,158,11,0.15)',  shadow: 'rgba(245,158,11,0.45)'  },
-  purple:  { label: 'Purple', accent: '#a855f7', dim: 'rgba(168,85,247,0.15)',   shadow: 'rgba(168,85,247,0.45)'  },
-  green:   { label: 'Green',  accent: '#10b981', dim: 'rgba(16,185,129,0.15)',   shadow: 'rgba(16,185,129,0.45)'  },
+  default: {
+    label: 'Blue & Orange',
+    bg: '#111827', surface: '#1f2937', border: '#374151', muted: '#9ca3af',
+    accent: '#f59e0b', dim: 'rgba(245,158,11,0.15)', shadow: 'rgba(245,158,11,0.45)',
+  },
+  purplegreen: {
+    label: 'Purple & Green',
+    bg: '#0e0b1a', surface: '#17122e', border: '#2a1f4a', muted: '#8b7eaa',
+    accent: '#4ade80', dim: 'rgba(74,222,128,0.15)', shadow: 'rgba(74,222,128,0.4)',
+  },
 };
 
 function applyTheme(name) {
   const t = THEMES[name] ?? THEMES.default;
   const r = document.documentElement.style;
+  r.setProperty('--bg',            t.bg);
+  r.setProperty('--surface',       t.surface);
+  r.setProperty('--border',        t.border);
+  r.setProperty('--muted',         t.muted);
   r.setProperty('--accent',        t.accent);
   r.setProperty('--accent-dim',    t.dim);
   r.setProperty('--accent-shadow', t.shadow);
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', t.bg);
   localStorage.setItem('gymlog-theme', name);
   document.querySelectorAll('.theme-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.theme === name));
@@ -116,7 +128,7 @@ function renderTabs() {
   bar.querySelectorAll('.tab:not(.tab-add)').forEach(tab => {
     tab.addEventListener('click', () => {
       activeGroup = tab.dataset.group;
-      if (activeGroup !== 'all') setNewGroup(activeGroup);
+      if (activeGroup !== 'all') selectedNewGroup = activeGroup;
       renderTabs();
       renderExercises();
     });
@@ -186,7 +198,7 @@ async function saveNewGroup() {
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
   activeGroup = ref.id;
-  setNewGroup(ref.id);
+  selectedNewGroup = ref.id;
 }
 
 // ── Exercise List ─────────────────────────────────────────────────────────────
@@ -221,7 +233,7 @@ function buildExerciseCard(ex) {
   card.className = 'exercise-card' + (doneToday ? ' done-today' : '');
   const safeName = ex.name.replace(/'/g, "\\'");
   card.innerHTML = `
-    <div class="card-body" onclick="openDetail('${ex.id}', '${safeName}', '${ex.group ?? ''}')">
+    <div class="card-body" onclick="openDetail('${ex.id}', '${safeName}')">
       <span class="card-name">${ex.name}${isCardio ? '<span class="cardio-badge">cardio</span>' : ''}</span>
       <span class="card-last">${ex.lastLog ?? 'No logs yet'}</span>
     </div>
@@ -256,7 +268,6 @@ function renderGroupPicker() {
     picker.innerHTML = '<span style="color:var(--muted);font-size:13px">No groups yet — create one with the + tab</span>';
     return;
   }
-  // Default selectedNewGroup to activeGroup if valid, else first group
   if (!selectedNewGroup || !allGroups.find(g => g.id === selectedNewGroup)) {
     selectedNewGroup = activeGroup !== 'all' ? activeGroup : allGroups[0]?.id;
   }
@@ -265,14 +276,11 @@ function renderGroupPicker() {
              data-group="${g.id}">${g.name}</button>`
   ).join('');
   picker.querySelectorAll('.group-btn').forEach(btn => {
-    btn.addEventListener('click', () => setNewGroup(btn.dataset.group));
-  });
-}
-
-function setNewGroup(groupId) {
-  selectedNewGroup = groupId;
-  document.querySelectorAll('.group-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.group === groupId);
+    btn.addEventListener('click', () => {
+      selectedNewGroup = btn.dataset.group;
+      picker.querySelectorAll('.group-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.group === selectedNewGroup));
+    });
   });
 }
 
@@ -289,15 +297,16 @@ async function saveExercise() {
 }
 
 // ── Exercise Detail ───────────────────────────────────────────────────────────
-function openDetail(id, name, groupId) {
+function openDetail(id, name) {
   currentExerciseId   = id;
-  currentExerciseGrp  = groupId;
-  currentExerciseType = allExercises.find(e => e.id === id)?.type ?? 'strength';
+  const ex = allExercises.find(e => e.id === id);
+  currentExerciseType = ex?.type ?? 'strength';
+  currentExerciseGrp  = ex?.group ?? null;
   $('detail-name').textContent = name;
-
-  const groupName = allGroups.find(g => g.id === groupId)?.name ?? '';
-  $('detail-group-chip').textContent = groupName;
-
+  const groupName = allGroups.find(g => g.id === ex?.group)?.name ?? '';
+  $('detail-group-chips').innerHTML = groupName
+    ? `<span class="group-chip">${groupName}</span>`
+    : '<span class="group-chip" style="color:var(--muted)">No group</span>';
   showScreen('detail');
   loadDetail(id);
 }
@@ -330,7 +339,6 @@ $('detail-log-btn').addEventListener('click', () => {
 $('move-exercise-btn').addEventListener('click', () => {
   const list = $('move-group-list');
   const others = allGroups.filter(g => g.id !== currentExerciseGrp);
-
   if (others.length === 0) {
     list.innerHTML = '<div class="state-msg">No other groups.\nCreate one with the + tab first.</div>';
   } else {
@@ -349,7 +357,7 @@ $('cancel-move-btn').addEventListener('click', () => $('move-modal').classList.a
 async function moveExercise(groupId, groupName) {
   $('move-modal').classList.add('hidden');
   currentExerciseGrp = groupId;
-  $('detail-group-chip').textContent = groupName;
+  $('detail-group-chips').innerHTML = `<span class="group-chip">${groupName}</span>`;
   await db.collection(userPath('exercises')).doc(currentExerciseId).update({ group: groupId });
 }
 
