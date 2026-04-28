@@ -78,24 +78,49 @@
   <div id="log-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
     <div class="modal">
       <h2 id="log-modal-title">Log Set</h2>
-      <div class="field">
-        <label>Weight</label>
-        <div class="stepper">
-          <button class="step-btn" data-target="weight-input" data-step="-5">−</button>
-          <input type="number" id="weight-input" value="45" min="0" step="any" inputmode="decimal">
-          <button class="step-btn" data-target="weight-input" data-step="5">+</button>
+      <div id="strength-inputs">
+        <div class="field">
+          <label>Weight</label>
+          <div class="stepper">
+            <button class="step-btn" data-target="weight-input" data-step="-5">−</button>
+            <input type="number" id="weight-input" value="45" min="0" step="any" inputmode="decimal">
+            <button class="step-btn" data-target="weight-input" data-step="5">+</button>
+          </div>
+          <div class="unit-toggle">
+            <button class="unit-btn active" data-unit="lbs">lbs</button>
+            <button class="unit-btn" data-unit="kg">kg</button>
+          </div>
         </div>
-        <div class="unit-toggle">
-          <button class="unit-btn active" data-unit="lbs">lbs</button>
-          <button class="unit-btn" data-unit="kg">kg</button>
+        <div class="field">
+          <label>Reps</label>
+          <div class="stepper">
+            <button class="step-btn" data-target="reps-input" data-step="-1">−</button>
+            <input type="number" id="reps-input" value="8" min="1" step="1" inputmode="numeric">
+            <button class="step-btn" data-target="reps-input" data-step="1">+</button>
+          </div>
         </div>
       </div>
-      <div class="field">
-        <label>Reps</label>
-        <div class="stepper">
-          <button class="step-btn" data-target="reps-input" data-step="-1">−</button>
-          <input type="number" id="reps-input" value="8" min="1" step="1" inputmode="numeric">
-          <button class="step-btn" data-target="reps-input" data-step="1">+</button>
+      <div id="cardio-inputs" class="hidden">
+        <div class="field">
+          <label>Duration</label>
+          <div class="duration-row">
+            <div class="duration-group">
+              <div class="stepper">
+                <button class="step-btn" data-target="minutes-input" data-step="-1">−</button>
+                <input type="number" id="minutes-input" value="20" min="0" inputmode="numeric">
+                <button class="step-btn" data-target="minutes-input" data-step="1">+</button>
+              </div>
+              <span class="duration-label">min</span>
+            </div>
+            <div class="duration-group">
+              <div class="stepper">
+                <button class="step-btn" data-target="seconds-input" data-step="-10">−</button>
+                <input type="number" id="seconds-input" value="0" min="0" max="59" inputmode="numeric">
+                <button class="step-btn" data-target="seconds-input" data-step="10">+</button>
+              </div>
+              <span class="duration-label">sec</span>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-actions">
@@ -111,6 +136,13 @@
       <h2>New Exercise</h2>
       <input type="text" id="new-exercise-input" placeholder="e.g. Bench Press"
              class="text-input" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="field">
+        <label>Type</label>
+        <div class="unit-toggle" id="type-toggle">
+          <button class="type-btn unit-btn active" data-type="strength">Strength</button>
+          <button class="type-btn unit-btn" data-type="cardio">Cardio</button>
+        </div>
+      </div>
       <div class="field">
         <label>Group</label>
         <div class="group-picker" id="group-picker"></div>
@@ -143,24 +175,49 @@
   <div id="edit-log-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
     <div class="modal">
       <h2>Edit Log</h2>
-      <div class="field">
-        <label>Weight</label>
-        <div class="stepper">
-          <button class="step-btn" data-target="edit-weight-input" data-step="-5">−</button>
-          <input type="number" id="edit-weight-input" value="45" min="0" step="any" inputmode="decimal">
-          <button class="step-btn" data-target="edit-weight-input" data-step="5">+</button>
+      <div id="edit-strength-inputs">
+        <div class="field">
+          <label>Weight</label>
+          <div class="stepper">
+            <button class="step-btn" data-target="edit-weight-input" data-step="-5">−</button>
+            <input type="number" id="edit-weight-input" value="45" min="0" step="any" inputmode="decimal">
+            <button class="step-btn" data-target="edit-weight-input" data-step="5">+</button>
+          </div>
+          <div class="unit-toggle" id="edit-unit-toggle">
+            <button class="edit-unit-btn unit-btn active" data-unit="lbs">lbs</button>
+            <button class="edit-unit-btn unit-btn" data-unit="kg">kg</button>
+          </div>
         </div>
-        <div class="unit-toggle" id="edit-unit-toggle">
-          <button class="edit-unit-btn unit-btn active" data-unit="lbs">lbs</button>
-          <button class="edit-unit-btn unit-btn" data-unit="kg">kg</button>
+        <div class="field">
+          <label>Reps</label>
+          <div class="stepper">
+            <button class="step-btn" data-target="edit-reps-input" data-step="-1">−</button>
+            <input type="number" id="edit-reps-input" value="8" min="1" step="1" inputmode="numeric">
+            <button class="step-btn" data-target="edit-reps-input" data-step="1">+</button>
+          </div>
         </div>
       </div>
-      <div class="field">
-        <label>Reps</label>
-        <div class="stepper">
-          <button class="step-btn" data-target="edit-reps-input" data-step="-1">−</button>
-          <input type="number" id="edit-reps-input" value="8" min="1" step="1" inputmode="numeric">
-          <button class="step-btn" data-target="edit-reps-input" data-step="1">+</button>
+      <div id="edit-cardio-inputs" class="hidden">
+        <div class="field">
+          <label>Duration</label>
+          <div class="duration-row">
+            <div class="duration-group">
+              <div class="stepper">
+                <button class="step-btn" data-target="edit-minutes-input" data-step="-1">−</button>
+                <input type="number" id="edit-minutes-input" value="20" min="0" inputmode="numeric">
+                <button class="step-btn" data-target="edit-minutes-input" data-step="1">+</button>
+              </div>
+              <span class="duration-label">min</span>
+            </div>
+            <div class="duration-group">
+              <div class="stepper">
+                <button class="step-btn" data-target="edit-seconds-input" data-step="-10">−</button>
+                <input type="number" id="edit-seconds-input" value="0" min="0" max="59" inputmode="numeric">
+                <button class="step-btn" data-target="edit-seconds-input" data-step="10">+</button>
+              </div>
+              <span class="duration-label">sec</span>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-actions">

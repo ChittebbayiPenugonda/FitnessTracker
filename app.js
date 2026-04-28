@@ -24,15 +24,17 @@ function applyTheme(name) {
 applyTheme(localStorage.getItem('gymlog-theme') ?? 'default');
 
 // ── State ────────────────────────────────────────────────────────────────────
-let currentUser        = null;
-let currentExerciseId  = null;
-let currentExerciseGrp = null;
-let progressChart      = null;
-let selectedUnit       = 'lbs';
-let activeGroup        = 'all';
-let selectedNewGroup   = null;
-let allExercises       = [];
-let allGroups          = [];
+let currentUser         = null;
+let currentExerciseId   = null;
+let currentExerciseGrp  = null;
+let currentExerciseType = 'strength';
+let progressChart       = null;
+let selectedUnit        = 'lbs';
+let activeGroup         = 'all';
+let selectedNewGroup    = null;
+let selectedNewType     = 'strength';
+let allExercises        = [];
+let allGroups           = [];
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 auth.onAuthStateChanged(user => {
@@ -215,11 +217,12 @@ function renderExercises() {
 function buildExerciseCard(ex) {
   const card = document.createElement('div');
   const doneToday = ex.lastLoggedDate === todayStr();
+  const isCardio  = ex.type === 'cardio';
   card.className = 'exercise-card' + (doneToday ? ' done-today' : '');
   const safeName = ex.name.replace(/'/g, "\\'");
   card.innerHTML = `
     <div class="card-body" onclick="openDetail('${ex.id}', '${safeName}', '${ex.group ?? ''}')">
-      <span class="card-name">${ex.name}</span>
+      <span class="card-name">${ex.name}${isCardio ? '<span class="cardio-badge">cardio</span>' : ''}</span>
       <span class="card-last">${ex.lastLog ?? 'No logs yet'}</span>
     </div>
     <button class="card-quick-log ${doneToday ? 'card-quick-log--done' : ''}" aria-label="Log set"
@@ -239,6 +242,13 @@ $('add-exercise-fab').addEventListener('click', () => {
 $('cancel-add-btn').addEventListener('click', () => $('add-modal').classList.add('hidden'));
 $('save-exercise-btn').addEventListener('click', saveExercise);
 $('new-exercise-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveExercise(); });
+
+document.querySelectorAll('.type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    selectedNewType = btn.dataset.type;
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === selectedNewType));
+  });
+});
 
 function renderGroupPicker() {
   const picker = $('group-picker');
@@ -268,19 +278,21 @@ function setNewGroup(groupId) {
 
 async function saveExercise() {
   const name = $('new-exercise-input').value.trim();
-  if (!name || !selectedNewGroup) return;
+  if (!name) return;
   $('add-modal').classList.add('hidden');
   await db.collection(userPath('exercises')).add({
     name,
-    group: selectedNewGroup,
+    type:  selectedNewType,
+    group: selectedNewGroup ?? null,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 }
 
 // ── Exercise Detail ───────────────────────────────────────────────────────────
 function openDetail(id, name, groupId) {
-  currentExerciseId  = id;
-  currentExerciseGrp = groupId;
+  currentExerciseId   = id;
+  currentExerciseGrp  = groupId;
+  currentExerciseType = allExercises.find(e => e.id === id)?.type ?? 'strength';
   $('detail-name').textContent = name;
 
   const groupName = allGroups.find(g => g.id === groupId)?.name ?? '';
@@ -372,15 +384,19 @@ function renderChart(logs) {
   canvas.classList.remove('hidden');
   empty.classList.add('hidden');
 
+  const isCardio = logs.some(l => l.type === 'cardio');
+
   const points = logs.map(log => ({
-    x:    log.timestamp?.toDate() ?? new Date(),
-    y:    log.weight,
-    reps: log.reps,
-    unit: log.unit ?? 'lbs'
+    x:        log.timestamp?.toDate() ?? new Date(),
+    y:        isCardio ? (log.duration ?? 0) / 60 : log.weight,
+    reps:     log.reps,
+    duration: log.duration,
+    unit:     log.unit ?? 'lbs',
+    isCardio
   }));
 
-  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-  const accentDim = accent + '14'; // ~8% opacity hex suffix
+  const accent    = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const accentDim = accent + '14';
 
   progressChart = new Chart(canvas, {
     type: 'line',
@@ -406,7 +422,9 @@ function renderChart(logs) {
         tooltip: {
           callbacks: {
             title: items => fmtDate(new Date(items[0].parsed.x)),
-            label: ctx  => `${ctx.raw.y} ${ctx.raw.unit}  ×  ${ctx.raw.reps} reps`
+            label: ctx  => ctx.raw.isCardio
+              ? fmtDuration(ctx.raw.duration ?? 0)
+              : `${ctx.raw.y} ${ctx.raw.unit}  ×  ${ctx.raw.reps} reps`
           }
         },
         datalabels: {
@@ -415,7 +433,7 @@ function renderChart(logs) {
           align: 'top',
           offset: 3,
           font: { size: 11, weight: '700' },
-          formatter: val => `${val.reps}r`
+          formatter: val => val.isCardio ? fmtDuration(val.duration ?? 0) : `${val.reps}r`
         }
       },
       scales: {
@@ -426,7 +444,10 @@ function renderChart(logs) {
           grid: { color: '#374151' }
         },
         y: {
-          ticks: { color: '#9ca3af' },
+          ticks: {
+            color: '#9ca3af',
+            callback: isCardio ? v => fmtDuration(Math.round(v * 60)) : undefined
+          },
           grid: { color: '#374151' }
         }
       }
@@ -451,10 +472,11 @@ function renderLogList(logs) {
     const day  = date ? fmtDate(date) : 'Unknown date';
     const header = day !== lastDay ? `<div class="date-header">${day}</div>` : '';
     lastDay = day;
+    const isCardio = log.type === 'cardio';
     return `${header}
       <div class="log-item log-item-tap" data-log-id="${log.id}">
-        <span class="log-weight">${log.weight} ${log.unit ?? 'lbs'}</span>
-        <span class="log-reps">${log.reps} reps</span>
+        <span class="log-weight">${isCardio ? fmtDuration(log.duration ?? 0) : `${log.weight} ${log.unit ?? 'lbs'}`}</span>
+        ${isCardio ? '' : `<span class="log-reps">${log.reps} reps</span>`}
         <span class="log-time">${date ? fmtTime(date) : ''}</span>
         <span class="log-edit-hint">edit</span>
       </div>`;
@@ -470,17 +492,29 @@ function renderLogList(logs) {
 }
 
 // ── Edit Log Modal ────────────────────────────────────────────────────────────
-let editingLogId   = null;
-let editingLogUnit = 'lbs';
+let editingLogId      = null;
+let editingLogUnit    = 'lbs';
+let editingLogCardio  = false;
 
 function openEditLogModal(log) {
-  editingLogId   = log.id;
-  editingLogUnit = log.unit ?? 'lbs';
-  $('edit-weight-input').value = log.weight;
-  $('edit-reps-input').value   = log.reps;
-  document.querySelectorAll('.edit-unit-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.unit === editingLogUnit);
-  });
+  editingLogId     = log.id;
+  editingLogCardio = log.type === 'cardio';
+
+  $('edit-strength-inputs').classList.toggle('hidden', editingLogCardio);
+  $('edit-cardio-inputs').classList.toggle('hidden', !editingLogCardio);
+
+  if (editingLogCardio) {
+    const total = log.duration ?? 0;
+    $('edit-minutes-input').value = Math.floor(total / 60);
+    $('edit-seconds-input').value = total % 60;
+  } else {
+    editingLogUnit = log.unit ?? 'lbs';
+    $('edit-weight-input').value = log.weight;
+    $('edit-reps-input').value   = log.reps;
+    document.querySelectorAll('.edit-unit-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.unit === editingLogUnit);
+    });
+  }
   $('edit-log-modal').classList.remove('hidden');
 }
 
@@ -495,12 +529,20 @@ document.querySelectorAll('.edit-unit-btn').forEach(btn => {
 $('cancel-edit-log-btn').addEventListener('click', () => $('edit-log-modal').classList.add('hidden'));
 
 $('save-edit-log-btn').addEventListener('click', async () => {
-  const weight = parseFloat($('edit-weight-input').value);
-  const reps   = parseInt($('edit-reps-input').value, 10);
-  if (isNaN(weight) || weight < 0 || isNaN(reps) || reps < 1) return;
-
   $('edit-log-modal').classList.add('hidden');
-  await db.collection(userPath('logs')).doc(editingLogId).update({ weight, reps, unit: editingLogUnit });
+  if (editingLogCardio) {
+    const mins = parseInt($('edit-minutes-input').value, 10) || 0;
+    const secs = Math.min(59, parseInt($('edit-seconds-input').value, 10) || 0);
+    const duration = mins * 60 + secs;
+    if (duration <= 0) return;
+    await db.collection(userPath('logs')).doc(editingLogId).update({ duration });
+  } else {
+    const weight = parseFloat($('edit-weight-input').value);
+    const reps   = parseInt($('edit-reps-input').value, 10);
+    if (isNaN(weight) || weight < 0 || isNaN(reps) || reps < 1) return;
+    await db.collection(userPath('logs')).doc(editingLogId).update({ weight, reps, unit: editingLogUnit });
+  }
+  await refreshExerciseLastLog(currentExerciseId);
   loadDetail(currentExerciseId);
 });
 
@@ -533,16 +575,21 @@ async function refreshExerciseLastLog(exerciseId) {
     ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     : null;
 
-  await exRef.update({
-    lastLog:        `${latest.weight} ${latest.unit ?? 'lbs'} × ${latest.reps} reps`,
-    lastLoggedDate: dateStr,
-    lastLoggedAt:   latest.timestamp
-  });
+  const lastLog = latest.type === 'cardio'
+    ? fmtDuration(latest.duration ?? 0)
+    : `${latest.weight} ${latest.unit ?? 'lbs'} × ${latest.reps} reps`;
+
+  await exRef.update({ lastLog, lastLoggedDate: dateStr, lastLoggedAt: latest.timestamp });
 }
 
 // ── Log Modal ─────────────────────────────────────────────────────────────────
 async function openLogModal(exerciseId, exerciseName) {
-  currentExerciseId = exerciseId;
+  currentExerciseId   = exerciseId;
+  currentExerciseType = allExercises.find(e => e.id === exerciseId)?.type ?? 'strength';
+
+  const isCardio = currentExerciseType === 'cardio';
+  $('strength-inputs').classList.toggle('hidden', isCardio);
+  $('cardio-inputs').classList.toggle('hidden', !isCardio);
 
   const snap = await db.collection(userPath('logs'))
     .where('exerciseId', '==', exerciseId)
@@ -552,9 +599,15 @@ async function openLogModal(exerciseId, exerciseName) {
     const last = snap.docs
       .map(d => d.data())
       .sort((a, b) => (b.timestamp?.seconds ?? 0) - (a.timestamp?.seconds ?? 0))[0];
-    $('weight-input').value = last.weight;
-    $('reps-input').value   = last.reps;
-    setUnit(last.unit ?? 'lbs');
+    if (isCardio) {
+      const total = last.duration ?? 0;
+      $('minutes-input').value = Math.floor(total / 60);
+      $('seconds-input').value = total % 60;
+    } else {
+      $('weight-input').value = last.weight;
+      $('reps-input').value   = last.reps;
+      setUnit(last.unit ?? 'lbs');
+    }
   }
 
   $('log-modal-title').textContent = `Log — ${exerciseName}`;
@@ -565,19 +618,30 @@ $('cancel-log-btn').addEventListener('click', () => $('log-modal').classList.add
 $('save-log-btn').addEventListener('click', saveLog);
 
 async function saveLog() {
-  const weight = parseFloat($('weight-input').value);
-  const reps   = parseInt($('reps-input').value, 10);
-  if (isNaN(weight) || weight < 0 || isNaN(reps) || reps < 1) return;
+  const ts     = firebase.firestore.FieldValue.serverTimestamp();
+  const logRef = db.collection(userPath('logs')).doc();
+  const exRef  = db.collection(userPath('exercises')).doc(currentExerciseId);
+  let logData, lastLog;
+
+  if (currentExerciseType === 'cardio') {
+    const mins = parseInt($('minutes-input').value, 10) || 0;
+    const secs = Math.min(59, parseInt($('seconds-input').value, 10) || 0);
+    const duration = mins * 60 + secs;
+    if (duration <= 0) return;
+    logData = { exerciseId: currentExerciseId, duration, type: 'cardio', timestamp: ts };
+    lastLog = fmtDuration(duration);
+  } else {
+    const weight = parseFloat($('weight-input').value);
+    const reps   = parseInt($('reps-input').value, 10);
+    if (isNaN(weight) || weight < 0 || isNaN(reps) || reps < 1) return;
+    logData = { exerciseId: currentExerciseId, weight, reps, unit: selectedUnit, timestamp: ts };
+    lastLog = `${weight} ${selectedUnit} × ${reps} reps`;
+  }
 
   $('log-modal').classList.add('hidden');
 
-  const ts      = firebase.firestore.FieldValue.serverTimestamp();
-  const logRef  = db.collection(userPath('logs')).doc();
-  const exRef   = db.collection(userPath('exercises')).doc(currentExerciseId);
-  const lastLog = `${weight} ${selectedUnit} × ${reps} reps`;
-
   const batch = db.batch();
-  batch.set(logRef, { exerciseId: currentExerciseId, weight, reps, unit: selectedUnit, timestamp: ts });
+  batch.set(logRef, logData);
   batch.update(exRef, { lastLog, lastLoggedAt: ts, lastLoggedDate: todayStr() });
   await batch.commit();
 
@@ -589,9 +653,13 @@ async function saveLog() {
 // ── Steppers ─────────────────────────────────────────────────────────────────
 document.querySelectorAll('.step-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const input = $(btn.dataset.target);
-    const step  = parseFloat(btn.dataset.step);
-    input.value = Math.max(0, (parseFloat(input.value) || 0) + step);
+    const input   = $(btn.dataset.target);
+    const step    = parseFloat(btn.dataset.step);
+    const isSeconds = input.id.includes('seconds');
+    let val = (parseFloat(input.value) || 0) + step;
+    val = Math.max(0, val);
+    if (isSeconds) val = Math.min(59, val);
+    input.value = val;
   });
 });
 
@@ -620,6 +688,12 @@ function fmtDate(d) {
 function fmtTime(d) {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
+function fmtDuration(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return s === 0 ? `${m}m` : `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
