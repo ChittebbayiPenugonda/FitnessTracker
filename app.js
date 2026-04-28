@@ -2,6 +2,27 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
+// ── Themes ───────────────────────────────────────────────────────────────────
+const THEMES = {
+  default: { label: 'Amber',  accent: '#f59e0b', dim: 'rgba(245,158,11,0.15)',  shadow: 'rgba(245,158,11,0.45)'  },
+  purple:  { label: 'Purple', accent: '#a855f7', dim: 'rgba(168,85,247,0.15)',   shadow: 'rgba(168,85,247,0.45)'  },
+  green:   { label: 'Green',  accent: '#10b981', dim: 'rgba(16,185,129,0.15)',   shadow: 'rgba(16,185,129,0.45)'  },
+};
+
+function applyTheme(name) {
+  const t = THEMES[name] ?? THEMES.default;
+  const r = document.documentElement.style;
+  r.setProperty('--accent',        t.accent);
+  r.setProperty('--accent-dim',    t.dim);
+  r.setProperty('--accent-shadow', t.shadow);
+  localStorage.setItem('gymlog-theme', name);
+  document.querySelectorAll('.theme-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.theme === name));
+}
+
+// Apply saved theme immediately (before auth)
+applyTheme(localStorage.getItem('gymlog-theme') ?? 'default');
+
 // ── State ────────────────────────────────────────────────────────────────────
 let currentUser        = null;
 let currentExerciseId  = null;
@@ -17,6 +38,12 @@ let allGroups          = [];
 auth.onAuthStateChanged(user => {
   currentUser = user;
   if (user) {
+    // Populate profile info
+    const initial = user.displayName?.charAt(0).toUpperCase() ?? user.email?.charAt(0).toUpperCase() ?? '?';
+    $('profile-btn').textContent             = initial;
+    $('profile-avatar-large').textContent    = initial;
+    $('profile-display-name').textContent    = user.displayName ?? '';
+    $('profile-display-email').textContent   = user.email ?? '';
     showScreen('list');
     loadGroups();
     loadExercises();
@@ -28,7 +55,30 @@ auth.onAuthStateChanged(user => {
 $('google-signin-btn').addEventListener('click', () => {
   auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(console.error);
 });
-$('signout-btn').addEventListener('click', () => auth.signOut());
+$('signout-btn').addEventListener('click', () => { $('profile-modal').classList.add('hidden'); auth.signOut(); });
+
+// ── Profile & Settings ────────────────────────────────────────────────────────
+$('profile-btn').addEventListener('click', () => $('profile-modal').classList.remove('hidden'));
+
+$('open-settings-btn').addEventListener('click', () => {
+  $('profile-modal').classList.add('hidden');
+  renderThemePicker();
+  $('settings-modal').classList.remove('hidden');
+});
+
+$('close-settings-btn').addEventListener('click', () => $('settings-modal').classList.add('hidden'));
+
+function renderThemePicker() {
+  const saved = localStorage.getItem('gymlog-theme') ?? 'default';
+  $('theme-picker').innerHTML = Object.entries(THEMES).map(([key, t]) => `
+    <button class="theme-btn ${saved === key ? 'active' : ''}" data-theme="${key}">
+      <span class="theme-swatch" style="background:${t.accent}"></span>
+      ${t.label}
+    </button>`).join('');
+  $('theme-picker').querySelectorAll('.theme-btn').forEach(btn => {
+    btn.addEventListener('click', () => applyTheme(btn.dataset.theme));
+  });
+}
 
 // ── Screens ──────────────────────────────────────────────────────────────────
 function showScreen(name) {
@@ -329,15 +379,18 @@ function renderChart(logs) {
     unit: log.unit ?? 'lbs'
   }));
 
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const accentDim = accent + '14'; // ~8% opacity hex suffix
+
   progressChart = new Chart(canvas, {
     type: 'line',
     plugins: [ChartDataLabels],
     data: {
       datasets: [{
         data: points,
-        borderColor: '#f59e0b',
-        backgroundColor: 'rgba(245,158,11,0.08)',
-        pointBackgroundColor: '#f59e0b',
+        borderColor: accent,
+        backgroundColor: accentDim,
+        pointBackgroundColor: accent,
         pointRadius: 5,
         pointHoverRadius: 7,
         tension: 0.25,
@@ -357,7 +410,7 @@ function renderChart(logs) {
           }
         },
         datalabels: {
-          color: '#f59e0b',
+          color: accent,
           anchor: 'end',
           align: 'top',
           offset: 3,
@@ -554,7 +607,7 @@ document.querySelectorAll('.unit-btn').forEach(btn => {
 });
 
 // ── Close modals on overlay tap ───────────────────────────────────────────────
-['log-modal', 'add-modal', 'manage-groups-modal', 'move-modal', 'edit-log-modal'].forEach(id => {
+['log-modal', 'add-modal', 'manage-groups-modal', 'move-modal', 'edit-log-modal', 'profile-modal', 'settings-modal'].forEach(id => {
   $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).classList.add('hidden'); });
 });
 

@@ -27,7 +27,7 @@
     <header class="top-bar">
       <h1>GymLog</h1>
       <button id="analytics-btn" class="text-btn">Stats</button>
-      <button id="signout-btn" class="text-btn">Sign out</button>
+      <button id="profile-btn" class="profile-btn" aria-label="Profile"></button>
     </header>
     <div id="tab-bar" class="tab-bar"></div>
     <div id="exercise-list" class="list-container">
@@ -177,6 +177,33 @@
       <h2>Move to Group</h2>
       <div id="move-group-list" class="move-group-list"></div>
       <button id="cancel-move-btn" class="btn-secondary" style="width:100%;margin-top:8px">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ── Profile Modal ── -->
+  <div id="profile-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="profile-header">
+        <div class="profile-avatar" id="profile-avatar-large"></div>
+        <div>
+          <div class="profile-name" id="profile-display-name"></div>
+          <div class="profile-email" id="profile-display-email"></div>
+        </div>
+      </div>
+      <button id="open-settings-btn" class="profile-action-btn">⚙ Settings</button>
+      <button id="signout-btn" class="profile-action-btn danger">↪ Sign out</button>
+    </div>
+  </div>
+
+  <!-- ── Settings Modal ── -->
+  <div id="settings-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>Settings</h2>
+      <div class="field">
+        <label>Theme</label>
+        <div class="theme-picker" id="theme-picker"></div>
+      </div>
+      <button id="close-settings-btn" class="btn-secondary" style="width:100%">Done</button>
     </div>
   </div>
 
